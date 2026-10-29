@@ -1,0 +1,50 @@
+{
+   "action": {
+      "default_icon": {
+         "19": "img/icon19.png",
+         "38": "img/icon38.png"
+      },
+      "default_popup": "bg/popup.html"
+   },
+   "author": "Zhenyu Huang",
+   "background": {
+      "service_worker": "bg/js/serviceworker.js"
+   },
+   "commands": {
+      "enabled": {
+         "description": "__MSG_lblEnabled__",
+         "suggested_key": {
+            "default": "Alt+Q"
+         }
+      }
+   },
+   "content_scripts": [ {
+      "css": [ "fg/css/client.css" ],
+      "js": [ "fg/js/popup.js", "fg/js/range.js", "fg/js/text.js", "fg/js/frontend_api.js", "fg/js/frontend.js" ],
+      "matches": [ "*://*/*", "file://*/*" ]
+   } ],
+   "default_locale": "en",
+   "description": "__MSG_appDesc__",
+   "icons": {
+      "128": "img/icon128.png",
+      "16": "img/icon16.png",
+      "48": "img/icon48.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1HrZxPB7xHwkR7v9oHKgq8mhqsYk+4O6UmjrDH/4swNFdhTA9bQe/CD4NEo5I9eMbEd+7lL+bCyDjCfNADG2TrAo7AM+46EMb+MJitt8DQszsXetgwimLwrc5jAvcNUrbmdDu6OxsZcFOqikgaEa3ImPUihnx1N/+qVDm6pT81sZrl2E5Mbp+UipVnBFL3nYHLJzFU4le/W2jWIK/DQ2poeJQu9USwAXhXNOp03lpXCkbEBFezQTrfVwxU1dBi419bYkqx6wvHaIR+tYGuVZTPSEKHpR2lWkBBDgIXdjgHigmQOViKH8ketEfvYNVRHrCTksZdXC9kApK+Any7VHtQIDAQAB",
+   "manifest_version": 3,
+   "minimum_chrome_version": "110.0.0.0",
+   "name": "__MSG_appName__",
+   "options_ui": {
+      "page": "bg/options.html"
+   },
+   "permissions": [ "offscreen", "storage" ],
+   "sandbox": {
+      "pages": [ "bg/sandbox/sandbox.html" ]
+   },
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "1.0.1",
+   "web_accessible_resources": [ {
+      "matches": [ "*://*/*", "file://*/*" ],
+      "resources": [ "fg/css/frame.css", "fg/css/spell.css", "fg/js/frame.js", "fg/js/spell.js", "fg/font/spell-icons.ttf", "fg/font/spell-icons.woff", "fg/img/play.png", "fg/img/plus.png", "fg/img/cloud.png", "fg/img/load.gif", "fg/img/fail.png", "fg/img/good.png" ]
+   } ]
+}

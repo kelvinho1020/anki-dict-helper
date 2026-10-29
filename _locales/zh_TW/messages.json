@@ -1,0 +1,262 @@
+{
+   "appDesc": {
+      "message": "顯示在線詞典內容的彈窗助手(支持Anki制卡)"
+   },
+   "appName": {
+      "message": "在線詞典助手"
+   },
+   "baCurrentDict": {
+      "message": "詞典名稱"
+   },
+   "baDeckname": {
+      "message": "牌組名稱"
+   },
+   "baEnabled": {
+      "message": "開關插件"
+   },
+   "baHotkey": {
+      "message": "取詞熱鍵"
+   },
+   "baMouseselection": {
+      "message": "啟用鼠標"
+   },
+   "baTags": {
+      "message": "筆記標籤"
+   },
+   "baTitle": {
+      "message": "快速選項"
+   },
+   "btnClose": {
+      "message": "退出"
+   },
+   "btnSaveClose": {
+      "message": "保存"
+   },
+   "btnSaveLoad": {
+      "message": "加載腳本"
+   },
+   "builtin_encn_Collins": {
+      "message": "柯林斯英漢詞典(內置)"
+   },
+   "builtin_encn_Oxford": {
+      "message": "牛津英漢詞典(內置)"
+   },
+   "cncn_Zdic": {
+      "message": "漢典漢語詞典"
+   },
+   "decn_Eudict": {
+      "message": "歐路德語助手"
+   },
+   "encn_Baicizhan": {
+      "message": "百詞斬英漢圖解詞典"
+   },
+   "encn_Cambridge": {
+      "message": "劍橋英漢雙解詞典(簡體)"
+   },
+   "encn_Cambridge_tc": {
+      "message": "劍橋英漢雙解詞典(繁體)"
+   },
+   "encn_Collins": {
+      "message": "柯林斯英漢雙解詞典"
+   },
+   "encn_Oxford": {
+      "message": "牛津英漢雙解詞典"
+   },
+   "encn_Youdao": {
+      "message": "有道簡明英漢詞典"
+   },
+   "enen_Collins": {
+      "message": "柯林斯英英詞典"
+   },
+   "enen_LDOCE6MDX": {
+      "message": "朗文6英英詞典(mdx)"
+   },
+   "enen_UrbanDict": {
+      "message": "Urban英英俚語詞典"
+   },
+   "enfr_Cambridge": {
+      "message": "劍橋英法詞典"
+   },
+   "enfr_Collins": {
+      "message": "柯林斯英法詞典"
+   },
+   "escn_Eudict": {
+      "message": "歐路西語助手"
+   },
+   "esen_Spanishdict": {
+      "message": "Spanishdict.com西英詞典"
+   },
+   "frcn_Eudict": {
+      "message": "歐路法語助手"
+   },
+   "frcn_Youdao": {
+      "message": "有道法漢詞典"
+   },
+   "fren_Cambridge": {
+      "message": "劍橋法英詞典"
+   },
+   "fren_Collins": {
+      "message": "柯林斯法英詞典"
+   },
+   "general_Makenotes": {
+      "message": "通用筆記摘錄腳本"
+   },
+   "grpAnki": {
+      "message": "Anki選項"
+   },
+   "grpDictionary": {
+      "message": "詞典選項"
+   },
+   "grpGeneral": {
+      "message": "通用選項"
+   },
+   "grpSysScripts": {
+      "message": "系統腳本"
+   },
+   "grpUdfScripts": {
+      "message": "自選腳本"
+   },
+   "labelAlignment": {
+      "message": "center"
+   },
+   "lblAllowDuplicate": {
+      "message": "重複製卡"
+   },
+   "lblAudio": {
+      "message": "音頻文件"
+   },
+   "lblAudioPref": {
+      "message": "音頻偏好"
+   },
+   "lblAudioPref0": {
+      "message": "英音"
+   },
+   "lblAudioPref1": {
+      "message": "美音"
+   },
+   "lblCurrentDict": {
+      "message": "詞典名稱"
+   },
+   "lblDeckname": {
+      "message": "牌組名稱"
+   },
+   "lblDefinition": {
+      "message": "單一釋義"
+   },
+   "lblDefinitions": {
+      "message": "全部釋義"
+   },
+   "lblEnabled": {
+      "message": "開關插件"
+   },
+   "lblExpression": {
+      "message": "單詞詞組"
+   },
+   "lblExtrainfo": {
+      "message": "額外信息"
+   },
+   "lblHotkey": {
+      "message": "取詞熱鍵"
+   },
+   "lblLingualType": {
+      "message": "單語雙語"
+   },
+   "lblMaxContext": {
+      "message": "原句數量"
+   },
+   "lblMaxExample": {
+      "message": "例句數量"
+   },
+   "lblMouseselection": {
+      "message": "啟用鼠標"
+   },
+   "lblPassword": {
+      "message": "用戶密碼"
+   },
+   "lblReading": {
+      "message": "發音音標"
+   },
+   "lblSentence": {
+      "message": "原句筆記"
+   },
+   "lblServices": {
+      "message": "數據導出"
+   },
+   "lblSignin": {
+      "message": "登錄"
+   },
+   "lblSignup": {
+      "message": "註冊"
+   },
+   "lblSysScripts": {
+      "message": "系統腳本名稱"
+   },
+   "lblTags": {
+      "message": "筆記標籤"
+   },
+   "lblTypename": {
+      "message": "模板名稱"
+   },
+   "lblUdfScripts": {
+      "message": "自選腳本名稱"
+   },
+   "lblUrl": {
+      "message": "來源網址"
+   },
+   "lblUsername": {
+      "message": "用戶郵箱"
+   },
+   "lstCloud": {
+      "message": "雲端"
+   },
+   "lstDescription": {
+      "message": "腳本描述"
+   },
+   "lstName": {
+      "message": "腳本名稱"
+   },
+   "lstOnoff": {
+      "message": "激活"
+   },
+   "msgConnecting": {
+      "message": "連接中..."
+   },
+   "msgFailed": {
+      "message": "未連接"
+   },
+   "msgSuccess": {
+      "message": "已連接:$INFORMATION$",
+      "placeholders": {
+         "information": {
+            "content": "$1"
+         }
+      }
+   },
+   "optTitle": {
+      "message": "在線詞典助手"
+   },
+   "rucn_Qianyi": {
+      "message": "千億俄漢詞典"
+   },
+   "selAllowed": {
+      "message": "允許"
+   },
+   "selBilingual": {
+      "message": "雙語"
+   },
+   "selMonolingual": {
+      "message": "單語"
+   },
+   "selNotAllowed": {
+      "message": "不允許"
+   },
+   "tabExtensionTitle": {
+      "message": "插件選項"
+   },
+   "tabScriptsTitle": {
+      "message": "腳本選項"
+   },
+   "tabServicesTitle": {
+      "message": "輸出選項"
+   }
+}
