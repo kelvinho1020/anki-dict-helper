@@ -1,12 +1,9 @@
 const ANKI_HOST = "https://ankiuser.net";
 const LOGIN_URL = `${ANKI_HOST}/account/login`;
-const DICTIONARY_URL =
-	"https://dictionary.cambridge.org/search/english-chinese-traditional/direct/?q=";
 const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
 const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
 
 class NotLoggedInError extends Error {}
-class BlockedError extends Error {}
 
 function encodeVarint(value) {
 	let number = BigInt(value);
@@ -158,23 +155,6 @@ async function addNote({ front, back, tags }) {
 	await callAnki("/svc/editor/add-or-update", body);
 }
 
-async function lookUp(word) {
-	const response = await fetch(DICTIONARY_URL + encodeURIComponent(word), {
-		credentials: "include",
-	});
-	if (response.status === 403 || response.status === 503) {
-		throw new BlockedError(`劍橋 ${response.status}`);
-	}
-	if (!response.ok) {
-		throw new Error(`劍橋 ${response.status}`);
-	}
-	const html = await response.text();
-	if (/challenge-platform|<title>Just a moment/i.test(html)) {
-		throw new BlockedError("劍橋要求真人驗證");
-	}
-	return html;
-}
-
 async function translateWithGoogle(text) {
 	const params = new URLSearchParams({
 		client: "gtx",
@@ -262,7 +242,6 @@ async function isAdded(word) {
 }
 
 const handlers = {
-	lookUp: ({ word }) => lookUp(word),
 	translate: ({ text }) => translate(text),
 	isAdded: ({ word }) => isAdded(word),
 	playAudio: ({ url }) => playAudio(url),
@@ -273,8 +252,6 @@ const handlers = {
 		await markAdded(note.word);
 	},
 	openLogin: () => chrome.tabs.create({ url: LOGIN_URL }),
-	openDictionary: ({ word }) =>
-		chrome.tabs.create({ url: DICTIONARY_URL + encodeURIComponent(word) }),
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -288,7 +265,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 			sendResponse({
 				ok: false,
 				notLoggedIn: err instanceof NotLoggedInError,
-				blocked: err instanceof BlockedError,
 				error: err.message,
 			});
 		});

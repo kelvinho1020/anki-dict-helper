@@ -93,14 +93,6 @@ button { font: inherit; cursor: pointer; }
 .original { padding: 8px 6px 4px; color: var(--muted); font-size: 13px; }
 .translation { padding: 4px 6px 10px; font-size: 16px; font-weight: 600; }
 .notes { padding: 4px 6px; font-size: 12px; color: var(--muted); }
-.notice {
-	margin-bottom: 6px; padding: 8px; border-radius: 6px; background: var(--pick);
-	color: var(--fg);
-}
-.verify {
-	margin: 6px 6px 0 0; border: 1px solid var(--accent); border-radius: 6px;
-	padding: 2px 8px; background: none; color: var(--accent); font-size: 12px;
-}
 `;
 
 let enabled = true;
@@ -124,6 +116,10 @@ function element(tag, className, text) {
 		node.textContent = text;
 	}
 	return node;
+}
+
+function cleanText(node) {
+	return node ? node.textContent.replace(/\s+/g, " ").trim() : "";
 }
 
 function shorten(text) {
@@ -341,28 +337,8 @@ function buildFoot(key, getCard, picked) {
 	return { foot, refresh };
 }
 
-async function lookUpWord(word) {
-	const response = await send("lookUp", { word });
-	return {
-		result: response?.ok ? parseCambridge(response.data) : null,
-		blocked: Boolean(response?.blocked),
-	};
-}
-
-function buildNotes(word, source, blocked) {
+function buildNotes(source) {
 	const notes = element("div", "notes");
-	if (blocked) {
-		const notice = element(
-			"div",
-			"notice",
-			"劍橋字典要先確認你是真人，這次先用其他翻譯。",
-		);
-		const verify = element("button", "verify", "打開劍橋驗證");
-		verify.type = "button";
-		verify.addEventListener("click", () => send("openDictionary", { word }));
-		notice.append(verify, element("span", "", "驗證完再查一次就好。"));
-		notes.append(notice);
-	}
 	if (source) {
 		notes.append(element("div", "source", `來源：${source}`));
 	}
@@ -438,23 +414,14 @@ async function openPanel() {
 	root.replaceChildren(panel);
 	panel.focus();
 
-	const isWord = WORD_PATTERN.test(word);
-	const lookup = isWord
-		? await lookUpWord(word)
-		: { result: null, blocked: false };
-	const { blocked } = lookup;
-	let { result } = lookup;
-	let source = result ? "劍橋英漢詞典" : "";
-	let translation = null;
-	if (!result) {
-		translation = await send("translate", { text: word });
-		source = translation?.data?.source ?? "";
-		result = isWord ? meaningsToResult(word, translation?.data) : null;
-	}
+	const translation = await send("translate", { text: word });
+	const result = WORD_PATTERN.test(word)
+		? meaningsToResult(word, translation?.data)
+		: null;
 	if (!panel.isConnected) {
 		return;
 	}
-	const notes = buildNotes(word, source, blocked);
+	const notes = buildNotes(translation?.data?.source);
 	if (!result) {
 		showTranslation(panel, body, word, sentence, translation, notes);
 		return;
