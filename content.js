@@ -1,4 +1,6 @@
-const WORD_PATTERN = /^[A-Za-z][A-Za-z'’-]*(?: [A-Za-z'’-]+){0,3}$/;
+const WORD_PATTERN = /^[A-Za-z][A-Za-z'’-]*(?: [A-Za-z'’-]+){0,2}$/;
+const EDGE_PUNCTUATION = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+const MAX_TEXT = 500;
 const PANEL_WIDTH = 340;
 const GAP = 8;
 
@@ -73,6 +75,8 @@ button { font: inherit; cursor: pointer; }
 	background: var(--accent); color: var(--accent-fg); font-weight: 600;
 }
 .add:disabled { opacity: .5; cursor: default; }
+.original { padding: 8px 6px 4px; color: var(--muted); font-size: 13px; }
+.translation { padding: 4px 6px 10px; font-size: 16px; font-weight: 600; }
 `;
 
 let enabled = true;
@@ -95,6 +99,10 @@ function element(tag, className, text) {
 		node.textContent = text;
 	}
 	return node;
+}
+
+function shorten(text) {
+	return text.length > 40 ? `${text.slice(0, 40)}…` : text;
 }
 
 function escapeHtml(text) {
@@ -255,7 +263,7 @@ function buildCardBack(result, senses, sentence) {
 	return parts.join("<br>");
 }
 
-function buildFoot(result, sentence, picked) {
+function buildFoot(key, getCard, picked) {
 	const foot = element("div", "foot");
 	const status = element("span", "status");
 	const add = element("button", "add", "加入 Anki");
@@ -266,10 +274,11 @@ function buildFoot(result, sentence, picked) {
 		status.className = `status ${kind}`;
 	};
 	const refresh = () => {
-		add.disabled = picked.size === 0;
-		if (!status.classList.contains("err")) {
-			setStatus(picked.size ? `已選 ${picked.size} 個解釋` : "請勾選要加入的解釋");
+		if (!picked || status.classList.contains("err")) {
+			return;
 		}
+		add.disabled = picked.size === 0;
+		setStatus(picked.size ? `已選 ${picked.size} 個解釋` : "請勾選要加入的解釋");
 	};
 
 	add.addEventListener("click", async () => {
@@ -279,12 +288,7 @@ function buildFoot(result, sentence, picked) {
 		}
 		add.disabled = true;
 		setStatus("加入中…");
-		const senses = result.senses.filter((_, index) => picked.has(index));
-		const response = await send("addNote", {
-			word: result.word,
-			front: escapeHtml(result.word),
-			back: buildCardBack(result, senses, sentence),
-		});
+		const response = await send("addNote", { word: key, ...getCard() });
 		if (response?.ok) {
 			setStatus("已加入，手機同步後就看得到", "ok");
 			add.textContent = "已加入";
@@ -301,7 +305,7 @@ function buildFoot(result, sentence, picked) {
 		add.disabled = false;
 	});
 
-	send("isAdded", { word: result.word }).then((response) => {
+	send("isAdded", { word: key }).then((response) => {
 		if (response?.data) {
 			add.textContent = "再加一次";
 		}
@@ -312,37 +316,70 @@ function buildFoot(result, sentence, picked) {
 	return { foot, refresh };
 }
 
+async function lookUpWord(word) {
+	const response = await send("lookUp", { word });
+	return response?.ok ? parseCambridge(response.data) : null;
+}
+
+async function showTranslation(panel, body, text, sentence) {
+	const response = await send("translate", { text });
+	if (!panel.isConnected) {
+		return;
+	}
+	if (!response?.ok || !response.data) {
+		body.replaceChildren(
+			element("div", "message", `翻譯失敗：${response?.error ?? "請稍後再試"}`),
+		);
+		return;
+	}
+	const translation = response.data;
+	body.replaceChildren(
+		element("div", "original", text),
+		element("div", "translation", translation),
+	);
+	const context = sentence && sentence !== text ? sentence : "";
+	const getCard = () => ({
+		front: escapeHtml(text),
+		back: [escapeHtml(translation), context && escapeHtml(context)]
+			.filter(Boolean)
+			.join("<hr>"),
+	});
+	const { foot } = buildFoot(text, getCard);
+	panel.replaceChildren(buildHead(shorten(text)), body, foot);
+}
+
 async function openPanel() {
 	const { word, sentence } = selection;
 	const panel = element("div", "panel");
 	panel.tabIndex = -1;
 	panel.setAttribute("role", "dialog");
-	panel.setAttribute("aria-label", `「${word}」的解釋`);
+	panel.setAttribute("aria-label", `「${shorten(word)}」的解釋`);
 	const body = element("div", "body");
 	body.append(element("div", "message", "查詢中…"));
-	panel.append(buildHead(word), body);
+	panel.append(buildHead(shorten(word)), body);
 	placePanel(panel);
 	root.replaceChildren(panel);
 	panel.focus();
 
-	const response = await send("lookUp", { word });
+	const result = WORD_PATTERN.test(word) ? await lookUpWord(word) : null;
 	if (!panel.isConnected) {
 		return;
 	}
-	if (!response?.ok) {
-		body.replaceChildren(
-			element("div", "message", `查詢失敗：${response?.error ?? "請稍後再試"}`),
-		);
-		return;
-	}
-	const result = parseCambridge(response.data);
 	if (!result) {
-		body.replaceChildren(element("div", "message", `查不到「${word}」`));
+		await showTranslation(panel, body, word, sentence);
 		return;
 	}
 
 	const picked = new Set([0]);
-	const { foot, refresh } = buildFoot(result, sentence, picked);
+	const getCard = () => ({
+		front: escapeHtml(result.word),
+		back: buildCardBack(
+			result,
+			result.senses.filter((_, index) => picked.has(index)),
+			sentence,
+		),
+	});
+	const { foot, refresh } = buildFoot(result.word, getCard, picked);
 	const onToggle = (index, checked) => {
 		if (checked) {
 			picked.add(index);
@@ -361,18 +398,26 @@ function handleMouseUp(event) {
 	if (!enabled || event.composedPath().includes(host)) {
 		return;
 	}
+	const isDoubleClick = event.detail === 2;
 	setTimeout(() => {
 		const current = window.getSelection();
-		const word = current?.toString().trim() ?? "";
-		if (!current?.rangeCount || word.length > 50 || !WORD_PATTERN.test(word)) {
+		const text = (current?.toString() ?? "")
+			.replace(/\s+/g, " ")
+			.replace(EDGE_PUNCTUATION, "");
+		if (!current?.rangeCount || text.length > MAX_TEXT || !/[A-Za-z]/.test(text)) {
 			return;
 		}
 		const range = current.getRangeAt(0);
 		selection = {
-			word,
+			word: text,
 			rect: range.getBoundingClientRect(),
-			sentence: readSentence(range, word),
+			sentence: readSentence(range, text),
 		};
+		if (isDoubleClick) {
+			mount();
+			openPanel();
+			return;
+		}
 		showBubble();
 	}, 0);
 }

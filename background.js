@@ -2,6 +2,8 @@ const ANKI_HOST = "https://ankiuser.net";
 const LOGIN_URL = `${ANKI_HOST}/account/login`;
 const DICTIONARY_URL =
 	"https://dictionary.cambridge.org/search/english-chinese-traditional/direct/?q=";
+const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
+const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
 
 class NotLoggedInError extends Error {}
 
@@ -163,6 +165,48 @@ async function lookUp(word) {
 	return response.text();
 }
 
+async function translateWithGoogle(text) {
+	const params = new URLSearchParams({
+		client: "gtx",
+		sl: "auto",
+		tl: "zh-TW",
+		dt: "t",
+		q: text,
+	});
+	const response = await fetch(`${TRANSLATE_URL}?${params}`);
+	if (!response.ok) {
+		throw new Error(`Google ${response.status}`);
+	}
+	const [segments] = await response.json();
+	return (segments ?? []).map((segment) => segment?.[0] ?? "").join("");
+}
+
+async function translateWithMyMemory(text) {
+	const params = new URLSearchParams({ q: text, langpair: "en|zh-TW" });
+	const response = await fetch(`${MYMEMORY_URL}?${params}`);
+	if (!response.ok) {
+		throw new Error(`MyMemory ${response.status}`);
+	}
+	const { responseData, responseStatus, responseDetails } =
+		await response.json();
+	if (responseStatus !== 200) {
+		throw new Error(responseDetails || `MyMemory ${responseStatus}`);
+	}
+	return responseData?.translatedText ?? "";
+}
+
+async function translate(text) {
+	try {
+		const result = await translateWithGoogle(text);
+		if (result) {
+			return result;
+		}
+	} catch (err) {
+		console.warn(err);
+	}
+	return translateWithMyMemory(text);
+}
+
 async function playAudio(url) {
 	const contexts = await chrome.runtime.getContexts({
 		contextTypes: ["OFFSCREEN_DOCUMENT"],
@@ -194,6 +238,7 @@ async function isAdded(word) {
 
 const handlers = {
 	lookUp: ({ word }) => lookUp(word),
+	translate: ({ text }) => translate(text),
 	isAdded: ({ word }) => isAdded(word),
 	playAudio: ({ url }) => playAudio(url),
 	getAnkiInfo: () => getAnkiInfo(),

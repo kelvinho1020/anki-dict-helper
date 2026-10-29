@@ -22,6 +22,8 @@
 	"permissions": ["storage", "offscreen"],
 	"host_permissions": [
 		"https://dictionary.cambridge.org/*",
+		"https://translate.googleapis.com/*",
+		"https://api.mymemory.translated.net/*",
 		"https://ankiuser.net/*",
 		"https://ankiweb.net/*"
 	],
