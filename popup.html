@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+	<meta charset="UTF-8">
+	<title>Anki 單字助手</title>
+	<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+	<h1>Anki 單字助手</h1>
+
+	<label class="row">
+		<span>選字後顯示「譯」按鈕</span>
+		<input id="enabled" type="checkbox">
+	</label>
+
+	<section>
+		<h2>AnkiWeb</h2>
+		<p id="account" class="muted">檢查登入狀態中…</p>
+		<button id="login" type="button" hidden>登入 AnkiWeb</button>
+		<div id="anki" hidden>
+			<label class="field">
+				<span>加到哪個牌組</span>
+				<select id="deck"></select>
+			</label>
+			<label class="field">
+				<span>卡片類型</span>
+				<select id="notetype"></select>
+			</label>
+			<p id="hint" class="muted"></p>
+		</div>
+	</section>
+
+	<script src="popup.js"></script>
+</body>
+</html>
