@@ -170,15 +170,25 @@ async function translateWithGoogle(text) {
 		client: "gtx",
 		sl: "auto",
 		tl: "zh-TW",
-		dt: "t",
 		q: text,
 	});
+	params.append("dt", "t");
+	params.append("dt", "bd");
 	const response = await fetch(`${TRANSLATE_URL}?${params}`);
 	if (!response.ok) {
 		throw new Error(`Google ${response.status}`);
 	}
-	const [segments] = await response.json();
-	return (segments ?? []).map((segment) => segment?.[0] ?? "").join("");
+	const [segments, dictionary] = await response.json();
+	return {
+		text: (segments ?? []).map((segment) => segment?.[0] ?? "").join(""),
+		meanings: (dictionary ?? []).map((group) => ({
+			partOfSpeech: group?.[0] ?? "",
+			entries: (group?.[2] ?? []).map((entry) => ({
+				word: entry?.[0] ?? "",
+				reverse: entry?.[1] ?? [],
+			})),
+		})),
+	};
 }
 
 async function translateWithMyMemory(text) {
@@ -192,13 +202,13 @@ async function translateWithMyMemory(text) {
 	if (responseStatus !== 200) {
 		throw new Error(responseDetails || `MyMemory ${responseStatus}`);
 	}
-	return responseData?.translatedText ?? "";
+	return { text: responseData?.translatedText ?? "", meanings: [] };
 }
 
 async function translate(text) {
 	try {
 		const result = await translateWithGoogle(text);
-		if (result) {
+		if (result.text) {
 			return result;
 		}
 	} catch (err) {

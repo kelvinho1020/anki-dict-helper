@@ -1,6 +1,21 @@
 const WORD_PATTERN = /^[A-Za-z][A-Za-z'’-]*(?: [A-Za-z'’-]+){0,2}$/;
 const EDGE_PUNCTUATION = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 const MAX_TEXT = 500;
+const PART_OF_SPEECH = {
+	noun: "名詞",
+	verb: "動詞",
+	adjective: "形容詞",
+	adverb: "副詞",
+	pronoun: "代名詞",
+	preposition: "介系詞",
+	conjunction: "連接詞",
+	interjection: "感嘆詞",
+	abbreviation: "縮寫",
+	phrase: "片語",
+	prefix: "字首",
+	suffix: "字尾",
+	article: "冠詞",
+};
 const PANEL_WIDTH = 340;
 const GAP = 8;
 
@@ -321,18 +336,31 @@ async function lookUpWord(word) {
 	return response?.ok ? parseCambridge(response.data) : null;
 }
 
-async function showTranslation(panel, body, text, sentence) {
-	const response = await send("translate", { text });
-	if (!panel.isConnected) {
-		return;
+function meaningsToResult(word, data) {
+	const senses = (data?.meanings ?? []).flatMap(({ partOfSpeech, entries }) =>
+		entries.slice(0, 6).map((entry) => ({
+			partOfSpeech: PART_OF_SPEECH[partOfSpeech] ?? partOfSpeech,
+			phrase: "",
+			chinese: entry.word,
+			english: entry.reverse.slice(0, 4).join(", "),
+			example: "",
+			exampleChinese: "",
+		})),
+	);
+	if (senses.length === 0) {
+		return null;
 	}
-	if (!response?.ok || !response.data) {
+	return { word, ipaUk: "", ipaUs: "", audioUk: "", audioUs: "", senses };
+}
+
+function showTranslation(panel, body, text, sentence, response) {
+	if (!response?.ok || !response.data?.text) {
 		body.replaceChildren(
 			element("div", "message", `翻譯失敗：${response?.error ?? "請稍後再試"}`),
 		);
 		return;
 	}
-	const translation = response.data;
+	const translation = response.data.text;
 	body.replaceChildren(
 		element("div", "original", text),
 		element("div", "translation", translation),
@@ -361,12 +389,18 @@ async function openPanel() {
 	root.replaceChildren(panel);
 	panel.focus();
 
-	const result = WORD_PATTERN.test(word) ? await lookUpWord(word) : null;
+	const isWord = WORD_PATTERN.test(word);
+	let result = isWord ? await lookUpWord(word) : null;
+	let translation = null;
+	if (!result) {
+		translation = await send("translate", { text: word });
+		result = isWord ? meaningsToResult(word, translation?.data) : null;
+	}
 	if (!panel.isConnected) {
 		return;
 	}
 	if (!result) {
-		await showTranslation(panel, body, word, sentence);
+		showTranslation(panel, body, word, sentence, translation);
 		return;
 	}
 
