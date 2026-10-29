@@ -92,9 +92,19 @@ button { font: inherit; cursor: pointer; }
 .add:disabled { opacity: .5; cursor: default; }
 .original { padding: 8px 6px 4px; color: var(--muted); font-size: 13px; }
 .translation { padding: 4px 6px 10px; font-size: 16px; font-weight: 600; }
+.notes { padding: 4px 6px; font-size: 12px; color: var(--muted); }
+.notice {
+	margin-bottom: 6px; padding: 8px; border-radius: 6px; background: var(--pick);
+	color: var(--fg);
+}
+.verify {
+	margin: 6px 6px 0 0; border: 1px solid var(--accent); border-radius: 6px;
+	padding: 2px 8px; background: none; color: var(--accent); font-size: 12px;
+}
 `;
 
 let enabled = true;
+let doubleClick = true;
 let selection = null;
 
 const host = document.createElement("div");
@@ -333,7 +343,30 @@ function buildFoot(key, getCard, picked) {
 
 async function lookUpWord(word) {
 	const response = await send("lookUp", { word });
-	return response?.ok ? parseCambridge(response.data) : null;
+	return {
+		result: response?.ok ? parseCambridge(response.data) : null,
+		blocked: Boolean(response?.blocked),
+	};
+}
+
+function buildNotes(word, source, blocked) {
+	const notes = element("div", "notes");
+	if (blocked) {
+		const notice = element(
+			"div",
+			"notice",
+			"劍橋字典要先確認你是真人，這次先用其他翻譯。",
+		);
+		const verify = element("button", "verify", "打開劍橋驗證");
+		verify.type = "button";
+		verify.addEventListener("click", () => send("openDictionary", { word }));
+		notice.append(verify, element("span", "", "驗證完再查一次就好。"));
+		notes.append(notice);
+	}
+	if (source) {
+		notes.append(element("div", "source", `來源：${source}`));
+	}
+	return notes;
 }
 
 function meaningsToResult(word, data) {
@@ -353,10 +386,11 @@ function meaningsToResult(word, data) {
 	return { word, ipaUk: "", ipaUs: "", audioUk: "", audioUs: "", senses };
 }
 
-function showTranslation(panel, body, text, sentence, response) {
+function showTranslation(panel, body, text, sentence, response, notes) {
 	if (!response?.ok || !response.data?.text) {
 		body.replaceChildren(
 			element("div", "message", `翻譯失敗：${response?.error ?? "請稍後再試"}`),
+			notes,
 		);
 		return;
 	}
@@ -364,6 +398,7 @@ function showTranslation(panel, body, text, sentence, response) {
 	body.replaceChildren(
 		element("div", "original", text),
 		element("div", "translation", translation),
+		notes,
 	);
 	const context = sentence && sentence !== text ? sentence : "";
 	const getCard = () => ({
@@ -390,17 +425,24 @@ async function openPanel() {
 	panel.focus();
 
 	const isWord = WORD_PATTERN.test(word);
-	let result = isWord ? await lookUpWord(word) : null;
+	const lookup = isWord
+		? await lookUpWord(word)
+		: { result: null, blocked: false };
+	const { blocked } = lookup;
+	let { result } = lookup;
+	let source = result ? "劍橋英漢詞典" : "";
 	let translation = null;
 	if (!result) {
 		translation = await send("translate", { text: word });
+		source = translation?.data?.source ?? "";
 		result = isWord ? meaningsToResult(word, translation?.data) : null;
 	}
 	if (!panel.isConnected) {
 		return;
 	}
+	const notes = buildNotes(word, source, blocked);
 	if (!result) {
-		showTranslation(panel, body, word, sentence, translation);
+		showTranslation(panel, body, word, sentence, translation, notes);
 		return;
 	}
 
@@ -424,6 +466,7 @@ async function openPanel() {
 	};
 	body.replaceChildren(
 		...result.senses.map((sense, index) => buildSense(sense, index, onToggle)),
+		notes,
 	);
 	panel.replaceChildren(buildHead(word, result), body, foot);
 }
@@ -447,7 +490,7 @@ function handleMouseUp(event) {
 			rect: range.getBoundingClientRect(),
 			sentence: readSentence(range, text),
 		};
-		if (isDoubleClick) {
+		if (isDoubleClick && doubleClick) {
 			mount();
 			openPanel();
 			return;
@@ -468,14 +511,19 @@ function handleKeyDown(event) {
 	}
 }
 
-chrome.storage.sync.get({ enabled: true }).then((settings) => {
-	({ enabled } = settings);
-});
+chrome.storage.sync
+	.get({ enabled: true, doubleClick: true })
+	.then((settings) => {
+		({ enabled, doubleClick } = settings);
+	});
 
 chrome.storage.onChanged.addListener((changes) => {
 	if (changes.enabled) {
 		enabled = changes.enabled.newValue;
 		hide();
+	}
+	if (changes.doubleClick) {
+		doubleClick = changes.doubleClick.newValue;
 	}
 });
 

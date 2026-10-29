@@ -6,6 +6,7 @@ const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
 const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
 
 class NotLoggedInError extends Error {}
+class BlockedError extends Error {}
 
 function encodeVarint(value) {
 	let number = BigInt(value);
@@ -158,11 +159,20 @@ async function addNote({ front, back, tags }) {
 }
 
 async function lookUp(word) {
-	const response = await fetch(DICTIONARY_URL + encodeURIComponent(word));
-	if (!response.ok) {
-		throw new Error(`Cambridge ${response.status}`);
+	const response = await fetch(DICTIONARY_URL + encodeURIComponent(word), {
+		credentials: "include",
+	});
+	if (response.status === 403 || response.status === 503) {
+		throw new BlockedError(`劍橋 ${response.status}`);
 	}
-	return response.text();
+	if (!response.ok) {
+		throw new Error(`劍橋 ${response.status}`);
+	}
+	const html = await response.text();
+	if (/challenge-platform|<title>Just a moment/i.test(html)) {
+		throw new BlockedError("劍橋要求真人驗證");
+	}
+	return html;
 }
 
 async function translateWithGoogle(text) {
@@ -180,6 +190,7 @@ async function translateWithGoogle(text) {
 	}
 	const [segments, dictionary] = await response.json();
 	return {
+		source: "Google 翻譯",
 		text: (segments ?? []).map((segment) => segment?.[0] ?? "").join(""),
 		meanings: (dictionary ?? []).map((group) => ({
 			partOfSpeech: group?.[0] ?? "",
@@ -202,7 +213,11 @@ async function translateWithMyMemory(text) {
 	if (responseStatus !== 200) {
 		throw new Error(responseDetails || `MyMemory ${responseStatus}`);
 	}
-	return { text: responseData?.translatedText ?? "", meanings: [] };
+	return {
+		source: "MyMemory",
+		text: responseData?.translatedText ?? "",
+		meanings: [],
+	};
 }
 
 async function translate(text) {
@@ -258,6 +273,8 @@ const handlers = {
 		await markAdded(note.word);
 	},
 	openLogin: () => chrome.tabs.create({ url: LOGIN_URL }),
+	openDictionary: ({ word }) =>
+		chrome.tabs.create({ url: DICTIONARY_URL + encodeURIComponent(word) }),
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -271,6 +288,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 			sendResponse({
 				ok: false,
 				notLoggedIn: err instanceof NotLoggedInError,
+				blocked: err instanceof BlockedError,
 				error: err.message,
 			});
 		});

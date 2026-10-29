@@ -1,4 +1,5 @@
 const enabledBox = document.getElementById("enabled");
+const doubleClickBox = document.getElementById("double-click");
 const account = document.getElementById("account");
 const login = document.getElementById("login");
 const anki = document.getElementById("anki");
@@ -57,12 +58,19 @@ async function loadAnki() {
 	await showFields(notetypeSelect.value);
 }
 
-chrome.storage.sync.get({ enabled: true }).then(({ enabled }) => {
-	enabledBox.checked = enabled;
-});
+chrome.storage.sync
+	.get({ enabled: true, doubleClick: true })
+	.then(({ enabled, doubleClick }) => {
+		enabledBox.checked = enabled;
+		doubleClickBox.checked = doubleClick;
+	});
 
 enabledBox.addEventListener("change", () => {
 	chrome.storage.sync.set({ enabled: enabledBox.checked });
+});
+
+doubleClickBox.addEventListener("change", () => {
+	chrome.storage.sync.set({ doubleClick: doubleClickBox.checked });
 });
 
 login.addEventListener("click", () => {
