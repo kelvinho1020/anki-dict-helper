@@ -370,7 +370,17 @@ function buildNotes(word, source, blocked) {
 }
 
 function meaningsToResult(word, data) {
-	const senses = (data?.meanings ?? []).flatMap(({ partOfSpeech, entries }) =>
+	const main = data?.text
+		? [{
+			partOfSpeech: "主要翻譯",
+			phrase: "",
+			chinese: data.text,
+			english: "",
+			example: "",
+			exampleChinese: "",
+		}]
+		: [];
+	const others = (data?.meanings ?? []).flatMap(({ partOfSpeech, entries }) =>
 		entries.slice(0, 6).map((entry) => ({
 			partOfSpeech: PART_OF_SPEECH[partOfSpeech] ?? partOfSpeech,
 			phrase: "",
@@ -380,9 +390,13 @@ function meaningsToResult(word, data) {
 			exampleChinese: "",
 		})),
 	);
-	if (senses.length === 0) {
+	if (others.length === 0) {
 		return null;
 	}
+	const senses = [
+		...main,
+		...others.filter((sense) => sense.chinese !== data.text),
+	];
 	return { word, ipaUk: "", ipaUs: "", audioUk: "", audioUs: "", senses };
 }
 
