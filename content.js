@@ -79,9 +79,14 @@ button { font: inherit; cursor: pointer; }
 .english { color: var(--muted); font-size: 13px; }
 .example { color: var(--muted); font-size: 12px; font-style: italic; }
 .foot {
-	display: flex; align-items: center; gap: 8px; padding: 10px 12px;
-	border-top: 1px solid var(--line);
+	display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+	padding: 10px 12px; border-top: 1px solid var(--line);
 }
+.custom {
+	flex-basis: 100%; padding: 6px 8px; border: 1px solid var(--line);
+	border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit;
+}
+.custom:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .status { flex: 1; font-size: 12px; color: var(--muted); }
 .status.ok { color: var(--ok); }
 .status.err { color: var(--err); }
@@ -252,14 +257,19 @@ function buildSense(sense, index, onToggle) {
 	return label;
 }
 
-function buildCardBack(result, senses, sentence) {
+function buildMine(mine) {
+	return mine ? `<div><b>[我的翻譯]</b> ${escapeHtml(mine)}</div>` : "";
+}
+
+function buildCardBack(result, senses, sentence, mine) {
 	const ipa = [
 		result.ipaUk && `英 /${result.ipaUk}/`,
 		result.ipaUs && `美 /${result.ipaUs}/`,
 	]
 		.filter(Boolean)
 		.join("　");
-	const parts = ipa ? [`<div>${escapeHtml(ipa)}</div>`] : [];
+	const parts = [ipa && `<div>${escapeHtml(ipa)}</div>`, buildMine(mine)]
+		.filter(Boolean);
 	for (const sense of senses) {
 		const tag = sense.phrase || sense.partOfSpeech;
 		const lines = [
@@ -286,6 +296,10 @@ function buildCardBack(result, senses, sentence) {
 
 function buildFoot(key, getCard, picked) {
 	const foot = element("div", "foot");
+	const custom = element("input", "custom");
+	custom.type = "text";
+	custom.placeholder = "自己的翻譯（可不填）";
+	custom.setAttribute("aria-label", "自己的翻譯");
 	const status = element("span", "status");
 	const add = element("button", "add", "加入 Anki");
 	add.type = "button";
@@ -298,9 +312,21 @@ function buildFoot(key, getCard, picked) {
 		if (!picked || status.classList.contains("err")) {
 			return;
 		}
-		add.disabled = picked.size === 0;
-		setStatus(picked.size ? `已選 ${picked.size} 個解釋` : "請勾選要加入的解釋");
+		const count = picked.size + (custom.value.trim() ? 1 : 0);
+		add.disabled = count === 0;
+		setStatus(count ? `已選 ${count} 個解釋` : "請勾選或自己輸入解釋");
 	};
+
+	custom.addEventListener("input", refresh);
+	custom.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			return;
+		}
+		event.stopPropagation();
+		if (event.key === "Enter" && !add.disabled) {
+			add.click();
+		}
+	});
 
 	add.addEventListener("click", async () => {
 		if (add.dataset.login) {
@@ -309,7 +335,10 @@ function buildFoot(key, getCard, picked) {
 		}
 		add.disabled = true;
 		setStatus("加入中…");
-		const response = await send("addNote", { word: key, ...getCard() });
+		const response = await send("addNote", {
+			word: key,
+			...getCard(custom.value.trim()),
+		});
 		if (response?.ok) {
 			setStatus("已加入，手機同步後就看得到", "ok");
 			add.textContent = "已加入";
@@ -332,7 +361,7 @@ function buildFoot(key, getCard, picked) {
 		}
 	});
 
-	foot.append(status, add);
+	foot.append(custom, status, add);
 	refresh();
 	return { foot, refresh };
 }
@@ -391,9 +420,13 @@ function showTranslation(panel, body, text, sentence, response, notes) {
 		notes,
 	);
 	const context = sentence && sentence !== text ? sentence : "";
-	const getCard = () => ({
+	const getCard = (mine) => ({
 		front: escapeHtml(text),
-		back: [escapeHtml(translation), context && escapeHtml(context)]
+		back: [
+			buildMine(mine),
+			escapeHtml(translation),
+			context && escapeHtml(context),
+		]
 			.filter(Boolean)
 			.join("<hr>"),
 	});
@@ -428,12 +461,13 @@ async function openPanel() {
 	}
 
 	const picked = new Set([0]);
-	const getCard = () => ({
+	const getCard = (mine) => ({
 		front: escapeHtml(result.word),
 		back: buildCardBack(
 			result,
 			result.senses.filter((_, index) => picked.has(index)),
 			sentence,
+			mine,
 		),
 	});
 	const { foot, refresh } = buildFoot(result.word, getCard, picked);
