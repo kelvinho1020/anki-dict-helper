@@ -445,7 +445,6 @@ async function openPanel() {
 	panel.append(buildHead(shorten(word)), body);
 	placePanel(panel);
 	root.replaceChildren(panel);
-	panel.focus();
 
 	const translation = await send("translate", { text: word });
 	const result = WORD_PATTERN.test(word)
@@ -486,8 +485,14 @@ async function openPanel() {
 	panel.replaceChildren(buildHead(word, result), body, foot);
 }
 
+function isEditable(node) {
+	return node instanceof HTMLElement
+		&& (node.isContentEditable || node.matches("input, textarea"));
+}
+
 function handleMouseUp(event) {
-	if (!enabled || event.composedPath().includes(host)) {
+	const path = event.composedPath();
+	if (!enabled || path.includes(host) || isEditable(path[0])) {
 		return;
 	}
 	const isDoubleClick = event.detail === 2;
