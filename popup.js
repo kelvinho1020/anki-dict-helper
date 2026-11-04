@@ -90,6 +90,12 @@ async function callBackground(type, payload = {}) {
 	);
 }
 
+function pause() {
+	return new Promise((resolve) => {
+		setTimeout(resolve, 200);
+	});
+}
+
 function resetRestore() {
 	pendingWords = [];
 	restoreMissing.hidden = true;
@@ -116,6 +122,7 @@ async function handleCheckAdded() {
 			}).catch((err) => {
 				throw new Error(`「${word}」${err.message}`);
 			});
+			await pause();
 			if (state === "inDeck") {
 				inDeck += 1;
 			} else {
@@ -155,6 +162,7 @@ async function handleRestoreMissing() {
 			).catch((err) => {
 				throw new Error(`「${word}」${err.message}`);
 			});
+			await pause();
 			pendingWords.shift();
 			added += 1;
 		}

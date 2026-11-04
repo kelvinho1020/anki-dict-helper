@@ -4,6 +4,10 @@ const LOGIN_URL = `${ANKI_HOST}/account/login`;
 const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
 const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
 const RESTORED_TAG = "anki-helper-restored";
+const REQUEST_TIMEOUT_MS = 20000;
+const READ_ATTEMPTS = 3;
+
+let readHost = ANKI_HOST;
 
 class NotLoggedInError extends Error {}
 
@@ -106,6 +110,7 @@ async function callAnki(path, body = [], host = ANKI_HOST) {
 		credentials: "include",
 		headers: { "Content-Type": "application/octet-stream" },
 		body: new Uint8Array(body),
+		signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 	});
 	if (response.status === 403 || response.redirected) {
 		throw new NotLoggedInError();
@@ -187,12 +192,24 @@ function escapeSearch(text) {
 }
 
 async function callWithFallback(path, body) {
-	return callAnki(path, body).catch((err) => {
-		if (err.status === 404) {
-			return callAnki(path, body, ANKI_WEB_HOST);
+	let attempts = 0;
+	while (true) {
+		try {
+			return await callAnki(path, body, readHost);
+		} catch (err) {
+			if (err.status === 404 && readHost === ANKI_HOST) {
+				readHost = ANKI_WEB_HOST;
+				continue;
+			}
+			attempts += 1;
+			if (err.name !== "TimeoutError") {
+				throw err;
+			}
+			if (attempts >= READ_ATTEMPTS) {
+				throw new Error("AnkiWeb 一直沒有回應，請晚點再試");
+			}
 		}
-		throw err;
-	});
+	}
 }
 
 async function searchNoteIds(query) {
