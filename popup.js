@@ -105,7 +105,12 @@ async function handleCheckAdded() {
 		for (const [index, word] of words.entries()) {
 			restoreStatus.textContent =
 				`檢查中 ${index + 1} / ${words.length}，請先不要關閉…`;
-			const state = await callBackground("checkWord", { word, fieldNames });
+			const state = await callBackground("checkWord", {
+				word,
+				fieldNames,
+			}).catch((err) => {
+				throw new Error(`「${word}」${err.message}`);
+			});
 			if (state === "missing") {
 				missingWords.push(word);
 			} else if (state === "otherDeck") {

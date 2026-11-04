@@ -1,10 +1,18 @@
 const ANKI_HOST = "https://ankiuser.net";
+const ANKI_WEB_HOST = "https://ankiweb.net";
 const LOGIN_URL = `${ANKI_HOST}/account/login`;
 const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
 const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
 const RESTORED_TAG = "anki-helper-restored";
 
 class NotLoggedInError extends Error {}
+
+class AnkiResponseError extends Error {
+	constructor(message, status) {
+		super(message);
+		this.status = status;
+	}
+}
 
 function encodeVarint(value) {
 	let number = BigInt(value);
@@ -92,8 +100,8 @@ function decodeFieldNames(list) {
 	return (list ?? []).map((bytes) => decodeString(decodeMessage(bytes)[2]?.[0]));
 }
 
-async function callAnki(path, body = []) {
-	const response = await fetch(`${ANKI_HOST}${path}`, {
+async function callAnki(path, body = [], host = ANKI_HOST) {
+	const response = await fetch(`${host}${path}`, {
 		method: "POST",
 		credentials: "include",
 		headers: { "Content-Type": "application/octet-stream" },
@@ -103,7 +111,11 @@ async function callAnki(path, body = []) {
 		throw new NotLoggedInError();
 	}
 	if (!response.ok) {
-		throw new Error(`AnkiWeb ${response.status}（${path}）`);
+		const detail = (await response.text()).trim().slice(0, 120);
+		throw new AnkiResponseError(
+			`AnkiWeb ${response.status}（${host}${path}）${detail}`,
+			response.status,
+		);
 	}
 	return decodeMessage(new Uint8Array(await response.arrayBuffer()));
 }
@@ -174,10 +186,14 @@ function escapeSearch(text) {
 }
 
 async function searchNoteCount(query) {
-	const fields = await callAnki(
-		"/svc/search/search",
-		encodeStringField(1, query),
-	);
+	const path = "/svc/search/search";
+	const body = encodeStringField(1, query);
+	const fields = await callAnki(path, body).catch((err) => {
+		if (err.status === 404) {
+			return callAnki(path, body, ANKI_WEB_HOST);
+		}
+		throw err;
+	});
 	const error = decodeString(fields[2]?.[0]);
 	if (error) {
 		throw new Error(error);
