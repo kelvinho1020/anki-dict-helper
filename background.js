@@ -103,7 +103,7 @@ async function callAnki(path, body = []) {
 		throw new NotLoggedInError();
 	}
 	if (!response.ok) {
-		throw new Error(`AnkiWeb ${response.status}`);
+		throw new Error(`AnkiWeb ${response.status}（${path}）`);
 	}
 	return decodeMessage(new Uint8Array(await response.arrayBuffer()));
 }
@@ -190,10 +190,20 @@ async function getRestoreInfo() {
 	const { notetypes } = await getAnkiInfo();
 	const names = new Set();
 	for (const { id } of notetypes) {
-		const [first] = await getNotetypeFields(id);
-		if (first) {
-			names.add(first);
+		try {
+			const [first] = await getNotetypeFields(id);
+			if (first) {
+				names.add(first);
+			}
+		} catch (err) {
+			if (err instanceof NotLoggedInError) {
+				throw err;
+			}
+			console.warn(err);
 		}
+	}
+	if (names.size === 0) {
+		throw new Error("讀不到卡片類型的欄位");
 	}
 	return { words: addedWords, fieldNames: [...names] };
 }
