@@ -212,7 +212,7 @@ async function callWithFallback(path, body) {
 	}
 }
 
-async function searchNoteIds(query) {
+async function searchNotes(query) {
 	const fields = await callWithFallback(
 		"/svc/search/search",
 		encodeStringField(1, query),
@@ -221,9 +221,9 @@ async function searchNoteIds(query) {
 	if (error) {
 		throw new Error(error);
 	}
-	return (fields[1] ?? []).map((bytes) =>
-		String(decodeMessage(bytes)[1]?.[0] ?? 0n),
-	);
+	return (fields[1] ?? []).map((bytes) => ({
+		text: decodeString(decodeMessage(bytes)[2]?.[0]),
+	}));
 }
 
 function deckTerm(deckName) {
@@ -244,7 +244,7 @@ async function verifyInDeck(front, fieldName, deckName) {
 	const term = `"${escapeSearch(fieldName)}:${escapeSearch(front)}"`;
 	let found;
 	try {
-		found = await searchNoteIds(`${deckTerm(deckName)} ${term}`);
+		found = await searchNotes(`${deckTerm(deckName)} ${term}`);
 	} catch (err) {
 		console.warn(err);
 		return;
@@ -279,29 +279,25 @@ async function getRestoreInfo() {
 
 async function checkWord({ word, fieldNames }) {
 	const terms = wordTerms(word, fieldNames);
-	if ((await searchNoteIds(`(${terms})`)).length === 0) {
+	if ((await searchNotes(`(${terms})`)).length === 0) {
 		return "missing";
 	}
 	const { deckName = "" } = await chrome.storage.sync.get("deckName");
-	const inDeck = await searchNoteIds(`${deckTerm(deckName)} (${terms})`);
+	const inDeck = await searchNotes(`${deckTerm(deckName)} (${terms})`);
 	return inDeck.length > 0 ? "inDeck" : "otherDeck";
 }
 
 async function copyWord({ word, fieldNames }) {
-	const [noteId] = await searchNoteIds(`(${wordTerms(word, fieldNames)})`);
-	if (!noteId) {
-		throw new Error("找不到原本的卡片");
+	const [note] = await searchNotes(`(${wordTerms(word, fieldNames)})`);
+	const [, front, back] = /^(.*?)(?:| \/ )(.*)$/s.exec(note?.text ?? "") ?? [];
+	if (!front || !back) {
+		await restoreWord(word);
+		return;
 	}
-	const note = await callWithFallback(
-		"/svc/editor/get-note-info",
-		encodeVarintField(1, noteId),
-	);
-	const [front, back] = (note[1] ?? []).map(decodeString);
-	const tags = decodeString(note[3]?.[0]);
 	await addNote({
-		front,
-		back: back ?? "",
-		tags: [tags, RESTORED_TAG].filter(Boolean).join(" "),
+		front: escapeHtml(front),
+		back: `<div>${escapeHtml(back)}</div>`,
+		tags: RESTORED_TAG,
 	});
 }
 
