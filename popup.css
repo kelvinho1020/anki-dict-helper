@@ -74,6 +74,15 @@ select {
 	font: inherit;
 }
 
+.restore button {
+	margin-bottom: 8px;
+}
+
+button:disabled {
+	opacity: .5;
+	cursor: default;
+}
+
 button {
 	padding: 6px 14px;
 	border: none;

@@ -340,7 +340,9 @@ function buildFoot(key, getCard, picked) {
 			...getCard(custom.value.trim()),
 		});
 		if (response?.ok) {
-			setStatus("已加入，手機同步後就看得到", "ok");
+			const deckName = response.data?.deckName;
+			const target = deckName ? `「${deckName}」` : "";
+			setStatus(`已加入${target}，手機同步後就看得到`, "ok");
 			add.textContent = "已加入";
 			return;
 		}

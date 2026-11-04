@@ -2,6 +2,7 @@ const ANKI_HOST = "https://ankiuser.net";
 const LOGIN_URL = `${ANKI_HOST}/account/login`;
 const TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
 const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
+const RESTORED_TAG = "anki-helper-restored";
 
 class NotLoggedInError extends Error {}
 
@@ -127,8 +128,12 @@ async function getNotetypeFields(notetypeId) {
 }
 
 async function addNote({ front, back, tags }) {
-	const settings = await chrome.storage.sync.get(["deckId", "notetypeId"]);
-	let { deckId, notetypeId } = settings;
+	const settings = await chrome.storage.sync.get([
+		"deckId",
+		"deckName",
+		"notetypeId",
+	]);
+	let { deckId, deckName, notetypeId } = settings;
 	let fieldNames;
 	if (deckId && notetypeId) {
 		fieldNames = await getNotetypeFields(notetypeId);
@@ -137,6 +142,7 @@ async function addNote({ front, back, tags }) {
 		deckId = info.currentDeckId;
 		notetypeId = info.currentNotetypeId;
 		fieldNames = info.currentFields;
+		deckName = info.decks.find(({ id }) => id === deckId)?.name;
 	}
 	const values = fieldNames.map((_, index) => {
 		if (index === 0) {
@@ -153,6 +159,69 @@ async function addNote({ front, back, tags }) {
 		]),
 	];
 	await callAnki("/svc/editor/add-or-update", body);
+	return deckName ?? "";
+}
+
+function escapeHtml(text) {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function escapeSearch(text) {
+	return text.replace(/[\\"*_:]/g, "\\$&");
+}
+
+async function searchNoteCount(query) {
+	const fields = await callAnki(
+		"/svc/search/search",
+		encodeStringField(1, query),
+	);
+	const error = decodeString(fields[2]?.[0]);
+	if (error) {
+		throw new Error(error);
+	}
+	return (fields[1] ?? []).length;
+}
+
+async function getRestoreInfo() {
+	const { addedWords = [] } = await chrome.storage.local.get("addedWords");
+	const { notetypes } = await getAnkiInfo();
+	const names = new Set();
+	for (const { id } of notetypes) {
+		const [first] = await getNotetypeFields(id);
+		if (first) {
+			names.add(first);
+		}
+	}
+	return { words: addedWords, fieldNames: [...names] };
+}
+
+async function checkWord({ word, fieldNames }) {
+	const value = escapeSearch(escapeHtml(word));
+	const terms = fieldNames
+		.map((name) => `"${escapeSearch(name)}:${value}"`)
+		.join(" OR ");
+	if (await searchNoteCount(`(${terms})`) === 0) {
+		return "missing";
+	}
+	const { deckName = "" } = await chrome.storage.sync.get("deckName");
+	const deck = `"deck:${escapeSearch(deckName)}"`;
+	const inDeck = await searchNoteCount(`${deck} (${terms})`);
+	return inDeck > 0 ? "inDeck" : "otherDeck";
+}
+
+async function restoreWord(word) {
+	const { text } = await translate(word);
+	if (!text) {
+		throw new Error("翻譯失敗");
+	}
+	await addNote({
+		front: escapeHtml(word),
+		back: `<div><b>[主要翻譯]</b> ${escapeHtml(text)}</div>`,
+		tags: RESTORED_TAG,
+	});
 }
 
 async function translateWithGoogle(text) {
@@ -248,9 +317,13 @@ const handlers = {
 	getAnkiInfo: () => getAnkiInfo(),
 	getNotetypeFields: ({ notetypeId }) => getNotetypeFields(notetypeId),
 	addNote: async (note) => {
-		await addNote(note);
+		const deckName = await addNote(note);
 		await markAdded(note.word);
+		return { deckName };
 	},
+	getRestoreInfo: () => getRestoreInfo(),
+	checkWord: (payload) => checkWord(payload),
+	restoreWord: ({ word }) => restoreWord(word),
 	openLogin: () => chrome.tabs.create({ url: LOGIN_URL }),
 };
 
