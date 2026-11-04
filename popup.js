@@ -10,7 +10,8 @@ const checkAdded = document.getElementById("check-added");
 const restoreMissing = document.getElementById("restore-missing");
 const restoreStatus = document.getElementById("restore-status");
 
-let missingWords = [];
+let pendingWords = [];
+let noteFieldNames = [];
 
 function fillSelect(select, items, selectedId) {
 	select.replaceChildren(
@@ -90,9 +91,13 @@ async function callBackground(type, payload = {}) {
 }
 
 function resetRestore() {
-	missingWords = [];
+	pendingWords = [];
 	restoreMissing.hidden = true;
 	restoreStatus.textContent = "";
+}
+
+function currentDeckName() {
+	return deckSelect.selectedOptions[0]?.textContent ?? "";
 }
 
 async function handleCheckAdded() {
@@ -100,7 +105,7 @@ async function handleCheckAdded() {
 	checkAdded.disabled = true;
 	try {
 		const { words, fieldNames } = await callBackground("getRestoreInfo");
-		const otherWords = [];
+		noteFieldNames = fieldNames;
 		let inDeck = 0;
 		for (const [index, word] of words.entries()) {
 			restoreStatus.textContent =
@@ -111,20 +116,19 @@ async function handleCheckAdded() {
 			}).catch((err) => {
 				throw new Error(`「${word}」${err.message}`);
 			});
-			if (state === "missing") {
-				missingWords.push(word);
-			} else if (state === "otherDeck") {
-				otherWords.push(word);
-			} else {
+			if (state === "inDeck") {
 				inDeck += 1;
+			} else {
+				pendingWords.push({ word, state });
 			}
 		}
-		const other = otherWords.length ? `（${otherWords.join("、")}）` : "";
-		restoreStatus.textContent = `共 ${words.length} 個：這個牌組有 ${inDeck} 個，`
-			+ `其他牌組有 ${otherWords.length} 個${other}，`
-			+ `找不到 ${missingWords.length} 個。`;
-		restoreMissing.textContent = `補回找不到的 ${missingWords.length} 個`;
-		restoreMissing.hidden = missingWords.length === 0;
+		const deckName = currentDeckName();
+		restoreStatus.textContent =
+			`共 ${words.length} 個，「${deckName}」已有 ${inDeck} 個，`
+			+ `還缺 ${pendingWords.length} 個。`;
+		restoreMissing.textContent =
+			`把 ${pendingWords.length} 個加進「${deckName}」`;
+		restoreMissing.hidden = pendingWords.length === 0;
 	} catch (err) {
 		restoreStatus.textContent = `檢查失敗：${err.message}`;
 	}
@@ -134,25 +138,34 @@ async function handleCheckAdded() {
 async function handleRestoreMissing() {
 	restoreMissing.disabled = true;
 	checkAdded.disabled = true;
-	const failed = [];
-	for (const [index, word] of missingWords.entries()) {
-		restoreStatus.textContent =
-			`補回中 ${index + 1} / ${missingWords.length}，請先不要關閉…`;
-		try {
-			await callBackground("restoreWord", { word });
-		} catch (err) {
-			failed.push(word);
+	const total = pendingWords.length;
+	const deckName = currentDeckName();
+	let added = 0;
+	try {
+		while (pendingWords.length > 0) {
+			const [{ word, state }] = pendingWords;
+			restoreStatus.textContent =
+				`加入中 ${added + 1} / ${total}，請先不要關閉…`;
+			await (state === "missing"
+				? callBackground("restoreWord", { word })
+				: callBackground("copyWord", {
+					word,
+					fieldNames: noteFieldNames,
+				})
+			).catch((err) => {
+				throw new Error(`「${word}」${err.message}`);
+			});
+			pendingWords.shift();
+			added += 1;
 		}
+		restoreStatus.textContent =
+			`已確認 ${added} 個都進了「${deckName}」。手機同步後就看得到。`;
+	} catch (err) {
+		restoreStatus.textContent =
+			`已加入 ${added} 個，然後停下來了：${err.message}`;
 	}
-	const added = missingWords.length - failed.length;
-	const deckName = deckSelect.selectedOptions[0]?.textContent ?? "";
-	const failure = failed.length
-		? `，${failed.length} 個失敗（${failed.join("、")}）`
-		: "";
-	restoreStatus.textContent = `已補回 ${added} 個到「${deckName}」${failure}。`;
-	missingWords = failed;
-	restoreMissing.textContent = `重試失敗的 ${failed.length} 個`;
-	restoreMissing.hidden = failed.length === 0;
+	restoreMissing.textContent = `重試剩下的 ${pendingWords.length} 個`;
+	restoreMissing.hidden = pendingWords.length === 0;
 	restoreMissing.disabled = false;
 	checkAdded.disabled = false;
 }

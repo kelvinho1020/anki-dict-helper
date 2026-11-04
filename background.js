@@ -171,6 +171,7 @@ async function addNote({ front, back, tags }) {
 		]),
 	];
 	await callAnki("/svc/editor/add-or-update", body);
+	await verifyInDeck(front, fieldNames[0], deckName);
 	return deckName ?? "";
 }
 
@@ -185,20 +186,55 @@ function escapeSearch(text) {
 	return text.replace(/[\\"*_:]/g, "\\$&");
 }
 
-async function searchNoteCount(query) {
-	const path = "/svc/search/search";
-	const body = encodeStringField(1, query);
-	const fields = await callAnki(path, body).catch((err) => {
+async function callWithFallback(path, body) {
+	return callAnki(path, body).catch((err) => {
 		if (err.status === 404) {
 			return callAnki(path, body, ANKI_WEB_HOST);
 		}
 		throw err;
 	});
+}
+
+async function searchNoteIds(query) {
+	const fields = await callWithFallback(
+		"/svc/search/search",
+		encodeStringField(1, query),
+	);
 	const error = decodeString(fields[2]?.[0]);
 	if (error) {
 		throw new Error(error);
 	}
-	return (fields[1] ?? []).length;
+	return (fields[1] ?? []).map((bytes) =>
+		String(decodeMessage(bytes)[1]?.[0] ?? 0n),
+	);
+}
+
+function deckTerm(deckName) {
+	return `"deck:${escapeSearch(deckName)}"`;
+}
+
+function wordTerms(word, fieldNames) {
+	const value = escapeSearch(escapeHtml(word));
+	return fieldNames
+		.map((name) => `"${escapeSearch(name)}:${value}"`)
+		.join(" OR ");
+}
+
+async function verifyInDeck(front, fieldName, deckName) {
+	if (!deckName || !fieldName) {
+		return;
+	}
+	const term = `"${escapeSearch(fieldName)}:${escapeSearch(front)}"`;
+	let found;
+	try {
+		found = await searchNoteIds(`${deckTerm(deckName)} ${term}`);
+	} catch (err) {
+		console.warn(err);
+		return;
+	}
+	if (found.length === 0) {
+		throw new Error(`AnkiWeb 回應成功，但卡片沒有進「${deckName}」`);
+	}
 }
 
 async function getRestoreInfo() {
@@ -225,17 +261,31 @@ async function getRestoreInfo() {
 }
 
 async function checkWord({ word, fieldNames }) {
-	const value = escapeSearch(escapeHtml(word));
-	const terms = fieldNames
-		.map((name) => `"${escapeSearch(name)}:${value}"`)
-		.join(" OR ");
-	if (await searchNoteCount(`(${terms})`) === 0) {
+	const terms = wordTerms(word, fieldNames);
+	if ((await searchNoteIds(`(${terms})`)).length === 0) {
 		return "missing";
 	}
 	const { deckName = "" } = await chrome.storage.sync.get("deckName");
-	const deck = `"deck:${escapeSearch(deckName)}"`;
-	const inDeck = await searchNoteCount(`${deck} (${terms})`);
-	return inDeck > 0 ? "inDeck" : "otherDeck";
+	const inDeck = await searchNoteIds(`${deckTerm(deckName)} (${terms})`);
+	return inDeck.length > 0 ? "inDeck" : "otherDeck";
+}
+
+async function copyWord({ word, fieldNames }) {
+	const [noteId] = await searchNoteIds(`(${wordTerms(word, fieldNames)})`);
+	if (!noteId) {
+		throw new Error("找不到原本的卡片");
+	}
+	const note = await callWithFallback(
+		"/svc/editor/get-note-info",
+		encodeVarintField(1, noteId),
+	);
+	const [front, back] = (note[1] ?? []).map(decodeString);
+	const tags = decodeString(note[3]?.[0]);
+	await addNote({
+		front,
+		back: back ?? "",
+		tags: [tags, RESTORED_TAG].filter(Boolean).join(" "),
+	});
 }
 
 async function restoreWord(word) {
@@ -350,6 +400,7 @@ const handlers = {
 	getRestoreInfo: () => getRestoreInfo(),
 	checkWord: (payload) => checkWord(payload),
 	restoreWord: ({ word }) => restoreWord(word),
+	copyWord: (payload) => copyWord(payload),
 	openLogin: () => chrome.tabs.create({ url: LOGIN_URL }),
 };
 
