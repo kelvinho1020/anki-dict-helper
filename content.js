@@ -88,6 +88,11 @@ button { font: inherit; cursor: pointer; }
 }
 .custom:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .status { flex: 1; font-size: 12px; color: var(--muted); }
+.url-option {
+	display: flex; align-items: center; gap: 4px; font-size: 12px;
+	color: var(--muted); white-space: nowrap; cursor: pointer;
+}
+.url-option input { margin: 0; accent-color: var(--accent); }
 .status.ok { color: var(--ok); }
 .status.err { color: var(--err); }
 .add {
@@ -294,12 +299,23 @@ function buildCardBack(result, senses, sentence, mine) {
 	return parts.join("<br>");
 }
 
+function buildSourceLink({ href, hostname }) {
+	const url = escapeHtml(href).replace(/"/g, "&quot;");
+	return `<br><small>來源：<a href="${url}">${escapeHtml(hostname)}</a></small>`;
+}
+
 function buildFoot(key, getCard, picked) {
 	const foot = element("div", "foot");
 	const custom = element("input", "custom");
 	custom.type = "text";
 	custom.placeholder = "自己的翻譯（可不填）";
 	custom.setAttribute("aria-label", "自己的翻譯");
+	const includeUrl = element("input");
+	includeUrl.type = "checkbox";
+	includeUrl.checked = true;
+	const urlOption = element("label", "url-option");
+	urlOption.append(includeUrl, element("span", "", "附網址"));
+	const isWebPage = /^https?:$/.test(window.location.protocol);
 	const status = element("span", "status");
 	const add = element("button", "add", "加入 Anki");
 	add.type = "button";
@@ -335,10 +351,11 @@ function buildFoot(key, getCard, picked) {
 		}
 		add.disabled = true;
 		setStatus("加入中…");
-		const response = await send("addNote", {
-			word: key,
-			...getCard(custom.value.trim()),
-		});
+		const card = getCard(custom.value.trim());
+		if (isWebPage && includeUrl.checked) {
+			card.back += buildSourceLink(window.location);
+		}
+		const response = await send("addNote", { word: key, ...card });
 		if (response?.ok) {
 			const deckName = response.data?.deckName;
 			const target = deckName ? `「${deckName}」` : "";
@@ -363,7 +380,11 @@ function buildFoot(key, getCard, picked) {
 		}
 	});
 
-	foot.append(custom, status, add);
+	foot.append(custom, status);
+	if (isWebPage) {
+		foot.append(urlOption);
+	}
+	foot.append(add);
 	refresh();
 	return { foot, refresh };
 }
